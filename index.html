@@ -1487,7 +1487,7 @@ function shortAddr(addr) {
 const COLORS = ['#D4A017','#F5C842','#38BDF8','#34D399','#FB923C','#F472B6','#A78BFA','#22D3EE'];
 
 // Ave.ai API
-const AVE_API_KEY = 'mwQOPupoqBczQqJVJUyVWMZKV7WVVXwQ2lm60as8dRLCIhm64MJe06gCZD4Kva1L';
+const AVE_API_KEY = 'UgbYEGOBtEx8r3uLTxCJPx7sEaYYMvZ6219iLSdYBUIFwbzu3HZ9qMeMprSdkHp9';
 const AVE_BASE = 'https://prod.ave-api.com';
 
 // Read token info from BSC chain + Ave.ai market data
@@ -1526,7 +1526,8 @@ async function fetchTokenData(addr) {
     );
     if (aveRes.ok) {
       const data = await aveRes.json();
-      const tokens = data?.data?.tokens || data?.tokens || data || [];
+      // data.data is an array of token objects, field name is "token" for address
+      const tokens = data?.data || [];
       const match = Array.isArray(tokens)
         ? tokens.find(t => (t.token || '').toLowerCase() === addr.toLowerCase())
         : null;
@@ -1536,7 +1537,7 @@ async function fetchTokenData(addr) {
           priceUsd = Number(match.current_price_usd);
           marketPrice = priceUsd;
         }
-        if (match.price_change_24h)  change24h = Number(match.price_change_24h);
+        if (match.price_change_24h != null)  change24h = Number(match.price_change_24h);
         if (match.tx_volume_u_24h)   volume24h = '$' + formatCompact(Number(match.tx_volume_u_24h));
         if (match.market_cap)        marketCap = '$' + formatCompact(Number(match.market_cap));
       }
@@ -1714,7 +1715,7 @@ function renderTokens() {
     } else if (t.status === 'soon') {
       actionHtml = `<a href="launch/mint.html?contract=${t.address}" target="_blank" class="tok-action-link">预约</a>`;
     } else {
-      actionHtml = `<a href="https://ave.ai/token/${t.address}?chain=bsc" target="_blank" class="tok-action-link ended">查看交易</a>`;
+      actionHtml = `<a href="https://ave.ai/token/${t.address}-bsc" target="_blank" class="tok-action-link ended">查看交易</a>`;
     }
 
     let badge = '';
