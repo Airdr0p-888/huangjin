@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GOLDLAUNCH | 黄金发射平台</title>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.umd.min.js"></script>
 <style>
 :root {
   --gold: #D4A017;
@@ -1420,25 +1420,11 @@ function saveTokens(list) {
 // Imported tokens loaded from localStorage
 let importedTokens = loadSavedTokens();
 
-// Build full token list: imported tokens + built-in demo tokens
+// Build token list: only imported tokens
 function buildTokenList() {
-  const all = [...importedTokens, ...DEFAULT_TOKENS];
-  all.forEach((t, i) => t.rank = i + 1);
-  return all;
+  importedTokens.forEach((t, i) => t.rank = i + 1);
+  return importedTokens;
 }
-
-const DEFAULT_TOKENS = [
-  { rank:1,  name:'GoldCore',    sym:'GCR',  color:'#D4A017', price:0.085,  change:+12.4, cap:'$8.5M',   vol:'$1.2M', progress:100, status:'ended' },
-  { rank:2,  name:'AuronFi',     sym:'AUFI', color:'#F5C842', price:0.042,  change:+6.8,  cap:'$4.2M',   vol:'$870K', progress:88,  status:'live'  },
-  { rank:3,  name:'GoldSwap',    sym:'GSWP', color:'#C084FC', price:0.021,  change:-3.1,  cap:'$2.1M',   vol:'$430K', progress:61,  status:'live'  },
-  { rank:4,  name:'BullionDAO',  sym:'BULL', color:'#38BDF8', price:0.056,  change:+18.7, cap:'$5.6M',   vol:'$2.1M', progress:100, status:'ended' },
-  { rank:5,  name:'GoldMine',    sym:'GMIN', color:'#34D399', price:0.013,  change:+2.3,  cap:'$1.3M',   vol:'$220K', progress:40,  status:'live'  },
-  { rank:6,  name:'AurumPad',    sym:'AURM', color:'#FB923C', price:0.077,  change:-1.5,  cap:'$7.7M',   vol:'$540K', progress:0,   status:'soon'  },
-  { rank:7,  name:'GoldenVault', sym:'GVLT', color:'#F472B6', price:0.033,  change:+9.2,  cap:'$3.3M',   vol:'$680K', progress:0,   status:'soon'  },
-  { rank:8,  name:'MetalFi',     sym:'MTFI', color:'#A78BFA', price:0.019,  change:-5.8,  cap:'$1.9M',   vol:'$310K', progress:100, status:'ended' },
-  { rank:9,  name:'GoldLock',    sym:'GLOCK',color:'#D4A017', price:0.044,  change:+3.6,  cap:'$4.4M',   vol:'$760K', progress:75,  status:'live'  },
-  { rank:10, name:'OrichalGold', sym:'ORC',  color:'#22D3EE', price:0.062,  change:+24.1, cap:'$6.2M',   vol:'$3.4M', progress:0,   status:'soon'  },
-];
 
 let tokFilterState = 'all';
 let tokSearchState = '';
@@ -1482,7 +1468,7 @@ function renderTokens() {
 
   const tbody = document.getElementById('tokBody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="tok-empty">暂无符合条件的代币</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="tok-empty">暂无代币，请在下方导入合约地址</td></tr>';
     return;
   }
 
