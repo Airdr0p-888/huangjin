@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GOLDLAUNCH | 黄金发射平台</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.5/dist/ethers.min.js"></script>
 <style>
 :root {
   --gold: #D4A017;
@@ -954,6 +955,58 @@ footer {
   nav { padding: 0 5%; }
   #cta { padding: 44px 24px; margin: 0 5%; }
 }
+.tok-import {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.tok-import input {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text);
+  font-size: 12px;
+  padding: 7px 14px;
+  width: 320px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .2s;
+}
+.tok-import input:focus { border-color: var(--border); }
+.tok-import input::placeholder { color: var(--muted); }
+
+.tok-import-btn {
+  background: var(--gold);
+  color: #000;
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  cursor: pointer;
+  clip-path: polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  font-family: inherit;
+  white-space: nowrap;
+  transition: opacity .2s;
+}
+.tok-import-btn:hover { opacity: .8; }
+.tok-import-btn:disabled { opacity: .4; cursor: default; }
+
+.tok-remove-btn {
+  background: transparent;
+  border: 1px solid rgba(239,68,68,.3);
+  color: #ef4444;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 4px 10px;
+  clip-path: polygon(3px 0%,100% 0%,calc(100% - 3px) 100%,0% 100%);
+  font-family: inherit;
+  transition: all .2s;
+  margin-left: 6px;
+}
+.tok-remove-btn:hover { background: rgba(239,68,68,.1); border-color: #ef4444; }
+
 </style>
 </head>
 <body>
@@ -968,6 +1021,7 @@ footer {
     <li><a href="#" class="active" onclick="switchTab('about');return false;">关于</a></li>
     <li><a href="#" onclick="switchTab('features');return false;">特性</a></li>
     <li><a href="#" onclick="switchTab('tokens');return false;">代币广场</a></li>
+    <li><a href="launch/index.html">发射台</a></li>
     <li><a href="#" onclick="switchTab('roadmap');return false;">路线图</a></li>
     <li><a href="#" onclick="switchTab('faq');return false;">FAQ</a></li>
   </ul>
@@ -984,6 +1038,7 @@ footer {
     <p class="hero-sub">以黄金为锚，铸就链上信仰。GOLDLAUNCH 是 BSC 链上首个以黄金 IP 为核心的 DeFi 发射平台，为下一代项目点火启航。</p>
     <div class="hero-btns">
       <a href="#" class="btn-fill" onclick="switchTab('features');return false;">探索平台</a>
+      <a href="launch/index.html" class="btn-fill">发射代币</a>
       <a href="#" class="btn-out" onclick="switchTab('about');return false;">了解更多</a>
     </div>
   </div>
@@ -1116,6 +1171,12 @@ footer {
           <button class="tok-filter" onclick="filterTokens('ended',this)">已结束</button>
         </div>
         <input class="tok-search" type="text" placeholder="搜索代币名称 / 符号…" oninput="searchTokens(this.value)">
+      </div>
+
+      <div class="tok-import" style="margin-bottom:18px;flex-wrap:wrap;">
+        <input id="importAddress" type="text" placeholder="输入已部署的合约地址（0x...）" style="flex:1;">
+        <button class="tok-import-btn" id="importBtn" onclick="importContract()">导入合约</button>
+        <span id="importStatus" style="font-size:11px;color:var(--muted);margin-left:10px;"></span>
       </div>
 
       <div class="tok-table-wrap">
@@ -1309,7 +1370,7 @@ function switchTab(name) {
   if (target) target.classList.add('active');
   // Update nav active state
   document.querySelectorAll('.nav-menu a').forEach(a => a.classList.remove('active'));
-  const navMap = { about:0, features:1, tokens:2, roadmap:3, faq:4 };
+  const navMap = { about:0, features:1, tokens:2, roadmap:4, faq:5 };
   if (navMap[name] !== undefined) {
     document.querySelectorAll('.nav-menu a')[navMap[name]].classList.add('active');
   }
@@ -1330,7 +1391,43 @@ function toggleFaq(el) {
 }
 
 // ── TOKEN SQUARE DATA & LOGIC ──
-const TOKENS = [
+
+// ModaFairMintTokenV1 read-only ABI
+const TOKEN_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function totalSupply() view returns (uint256)",
+  "function mintPrice() view returns (uint256)",
+  "function tokenPerMint() view returns (uint256)",
+  "function mintedCount() view returns (uint256)",
+  "function maxMintCount() view returns (uint256)",
+  "function mintEnabled() view returns (bool)",
+  "function tradingOpen() view returns (bool)",
+  "function owner() view returns (address)",
+  "function pair() view returns (address)"
+];
+
+const STORAGE_KEY = 'goldlaunch_imported_tokens';
+
+function loadSavedTokens() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+}
+function saveTokens(list) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
+}
+
+// Imported tokens loaded from localStorage
+let importedTokens = loadSavedTokens();
+
+// Build full token list: imported tokens + built-in demo tokens
+function buildTokenList() {
+  const all = [...importedTokens, ...DEFAULT_TOKENS];
+  all.forEach((t, i) => t.rank = i + 1);
+  return all;
+}
+
+const DEFAULT_TOKENS = [
   { rank:1,  name:'GoldCore',    sym:'GCR',  color:'#D4A017', price:0.085,  change:+12.4, cap:'$8.5M',   vol:'$1.2M', progress:100, status:'ended' },
   { rank:2,  name:'AuronFi',     sym:'AUFI', color:'#F5C842', price:0.042,  change:+6.8,  cap:'$4.2M',   vol:'$870K', progress:88,  status:'live'  },
   { rank:3,  name:'GoldSwap',    sym:'GSWP', color:'#C084FC', price:0.021,  change:-3.1,  cap:'$2.1M',   vol:'$430K', progress:61,  status:'live'  },
@@ -1371,7 +1468,7 @@ function sortTokens(key) {
 }
 
 function renderTokens() {
-  let list = TOKENS.filter(t => {
+  let list = buildTokenList().filter(t => {
     if (tokFilterState !== 'all' && t.status !== tokFilterState) return false;
     if (tokSearchState && !t.name.toLowerCase().includes(tokSearchState) && !t.sym.toLowerCase().includes(tokSearchState)) return false;
     return true;
@@ -1390,8 +1487,8 @@ function renderTokens() {
   }
 
   tbody.innerHTML = list.map((t, i) => {
-    const chgClass = t.change >= 0 ? 'tok-up' : 'tok-down';
-    const chgSign  = t.change >= 0 ? '+' : '';
+    const chgClass = t.imported ? '' : t.change >= 0 ? 'tok-up' : 'tok-down';
+    const chgSign  = t.imported ? '' : t.change >= 0 ? '+' : '';
     const statusLabel = { live:'进行中', soon:'即将开始', ended:'已结束' }[t.status];
     const actionLabel = t.status === 'live' ? '参与' : t.status === 'soon' ? '预约' : '查看';
     const actionDisabled = t.status === 'ended' ? 'disabled' : '';
@@ -1402,23 +1499,146 @@ function renderTokens() {
         <div class="tok-name-cell">
           <div class="tok-icon" style="background:${t.color}">${t.sym.slice(0,2)}</div>
           <div>
-            <div class="tok-name">${t.name}</div>
-            <div class="tok-sym">${t.sym}</div>
+            <div class="tok-name">${t.name} ${t.imported ? '<span style="font-size:9px;color:var(--gold);background:var(--gold-dim);padding:1px 5px;clip-path:polygon(3px 0%,100% 0%,calc(100% - 3px) 100%,0% 100%);margin-left:4px;">已导入</span>' : ''}</div>
+            <div class="tok-sym" title="${t.address||''}">${t.sym}${t.imported ? ' · '+shortAddr(t.address) : ''}</div>
           </div>
         </div>
       </td>
       <td class="tok-price">$${t.price.toFixed(3)}</td>
-      <td><span class="tok-change ${chgClass}">${chgSign}${t.change}%</span></td>
+      <td><span class="tok-change ${chgClass}">${t.imported ? '--' : chgSign+t.change+'%'}</span></td>
       <td class="tok-cap">${t.cap}</td>
       <td class="tok-vol">${t.vol}</td>
       <td>
         <div class="tok-bar-wrap"><div class="tok-bar" style="width:${t.progress}%"></div></div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">${t.progress}%</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">${t.progress}% ${t.imported ? '('+t.mintedCount+'/'+t.maxMintCount+')' : ''}</div>
       </td>
       <td><span class="tok-status ${t.status}">${statusLabel}</span></td>
-      <td><button class="tok-action" ${actionDisabled}>${actionLabel}</button></td>
+      <td>
+        <button class="tok-action" ${actionDisabled}>${actionLabel}</button>
+        ${t.imported ? `<button class="tok-remove-btn" onclick="removeImportedToken('${t.address}')" title="移除">✕</button>` : ''}
+      </td>
     </tr>`;
   }).join('');
+}
+
+// ── Import contract from BSC chain ──
+const BSC_RPC = 'https://bsc-dataseed1.binance.org';
+let importProvider = null;
+let importBusy = false;
+
+function getImportProvider() {
+  if (!importProvider) {
+    importProvider = new ethers.JsonRpcProvider(BSC_RPC);
+  }
+  return importProvider;
+}
+
+function formatUnits(val, dec) {
+  try { return ethers.formatUnits(val, dec); } catch { return '0'; }
+}
+
+function isAddress(addr) {
+  return ethers.isAddress(String(addr || '').trim());
+}
+
+function shortAddr(addr) {
+  return addr ? `${addr.slice(0,6)}...${addr.slice(-4)}` : '';
+}
+
+async function importContract() {
+  if (importBusy) return;
+  const input = document.getElementById('importAddress');
+  const btn = document.getElementById('importBtn');
+  const status = document.getElementById('importStatus');
+  const addr = input.value.trim();
+
+  if (!isAddress(addr)) {
+    status.textContent = '请输入有效的合约地址';
+    status.style.color = '#ef4444';
+    return;
+  }
+
+  // Check duplicate
+  if (importedTokens.some(t => t.address.toLowerCase() === addr.toLowerCase())) {
+    status.textContent = '该合约已导入';
+    status.style.color = '#D4A017';
+    return;
+  }
+
+  importBusy = true;
+  btn.disabled = true;
+  btn.textContent = '读取中...';
+  status.textContent = '正在读取链上数据...';
+  status.style.color = 'var(--muted)';
+
+  try {
+    const provider = getImportProvider();
+    const contract = new ethers.Contract(addr, TOKEN_ABI, provider);
+
+    const [
+      name, symbol, decimals, totalSupply, mintPrice, tokenPerMint,
+      mintedCount, maxMintCount, mintEnabled, tradingOpen
+    ] = await Promise.all([
+      contract.name(), contract.symbol(), contract.decimals(), contract.totalSupply(),
+      contract.mintPrice(), contract.tokenPerMint(), contract.mintedCount(),
+      contract.maxMintCount(), contract.mintEnabled(), contract.tradingOpen()
+    ]);
+
+    const dec = Number(decimals);
+    const minted = Number(mintedCount);
+    const max = Number(maxMintCount);
+    const progress = max > 0 ? Math.min(100, Math.round(minted / max * 100)) : 0;
+
+    let statusVal = 'ended';
+    if (mintEnabled && progress < 100) statusVal = 'live';
+    else if (!tradingOpen && progress === 0) statusVal = 'soon';
+    else statusVal = 'ended';
+
+    const colors = ['#D4A017','#F5C842','#38BDF8','#34D399','#FB923C','#F472B6','#A78BFA','#22D3EE'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+
+    const newToken = {
+      rank: 0,
+      name: name,
+      sym: symbol,
+      color: color,
+      price: Number(formatUnits(mintPrice, 18)),
+      change: 0,
+      cap: '--',
+      vol: '--',
+      progress: progress,
+      status: statusVal,
+      address: addr,
+      imported: true,
+      totalSupply: formatUnits(totalSupply, dec),
+      decimals: dec,
+      mintedCount: minted,
+      maxMintCount: max,
+      mintEnabled: mintEnabled,
+      tradingOpen: tradingOpen
+    };
+
+    importedTokens.push(newToken);
+    saveTokens(importedTokens);
+    input.value = '';
+    status.textContent = `已导入 ${name} (${symbol})`;
+    status.style.color = '#22c55e';
+    renderTokens();
+  } catch (err) {
+    const msg = err.shortMessage || err.message || String(err);
+    status.textContent = '读取失败: ' + (msg.length > 60 ? msg.slice(0,60)+'...' : msg);
+    status.style.color = '#ef4444';
+  } finally {
+    importBusy = false;
+    btn.disabled = false;
+    btn.textContent = '导入合约';
+  }
+}
+
+function removeImportedToken(address) {
+  importedTokens = importedTokens.filter(t => t.address.toLowerCase() !== address.toLowerCase());
+  saveTokens(importedTokens);
+  renderTokens();
 }
 
 // Init token table when page loads
