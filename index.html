@@ -722,6 +722,26 @@ h1 em {
 .tok-action:hover { background: var(--gold-dim); }
 .tok-action:disabled { opacity: .35; cursor: default; }
 
+.tok-action-link {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 5px 14px;
+  clip-path: polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  transition: background .2s;
+  cursor: pointer;
+  background: transparent;
+  white-space: nowrap;
+}
+.tok-action-link:hover { background: var(--gold-dim); color: var(--gold); }
+.tok-action-link.ended { color: var(--muted); border-color: var(--border-subtle); }
+.tok-action-link.ended:hover { color: #38BDF8; border-color: rgba(56,189,248,.35); background: rgba(56,189,248,.08); }
+
 .tok-bar-wrap {
   background: var(--border-subtle);
   height: 3px;
@@ -1185,7 +1205,7 @@ footer {
             <tr>
               <th onclick="sortTokens('rank')">#<span class="sort-arrow">↕</span></th>
               <th onclick="sortTokens('name')">代币<span class="sort-arrow">↕</span></th>
-              <th onclick="sortTokens('price')">发行价<span class="sort-arrow">↕</span></th>
+              <th onclick="sortTokens('price')">价格<span class="sort-arrow">↕</span></th>
               <th onclick="sortTokens('change')">24h 涨跌<span class="sort-arrow">↕</span></th>
               <th onclick="sortTokens('cap')">市值<span class="sort-arrow">↕</span></th>
               <th onclick="sortTokens('vol')">24h 成交量<span class="sort-arrow">↕</span></th>
@@ -1408,22 +1428,232 @@ const TOKEN_ABI = [
   "function pair() view returns (address)"
 ];
 
+// ── Data layers ──
 const STORAGE_KEY = 'goldlaunch_imported_tokens';
+const LOCAL_KEY   = 'goldlaunch_local_tokens';  // personal manual imports
 
-function loadSavedTokens() {
+function loadLocalTokens() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || '[]'); } catch { return []; }
+}
+function saveLocalTokens(list) {
+  try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); } catch {}
+}
+
+// Cached public tokens (fetched from tokens.json + chain, cached in localStorage)
+function loadPublicCache() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 }
-function saveTokens(list) {
+function savePublicCache(list) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch {}
 }
 
-// Imported tokens loaded from localStorage
-let importedTokens = loadSavedTokens();
+let publicTokens  = loadPublicCache();  // all visitors see these (from tokens.json)
+let localTokens   = loadLocalTokens();   // only this browser sees these
 
-// Build token list: only imported tokens
+// Build merged token list: public first, then local (dedup by address)
 function buildTokenList() {
-  importedTokens.forEach((t, i) => t.rank = i + 1);
-  return importedTokens;
+  const seen = new Set();
+  const all = [];
+  for (const t of [...publicTokens, ...localTokens]) {
+    const key = t.address.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    all.push(t);
+  }
+  all.forEach((t, i) => t.rank = i + 1);
+  return all;
+}
+
+// ── Chain reading ──
+const BSC_RPC = 'https://bsc-dataseed1.binance.org';
+let importProvider = null;
+let importBusy = false;
+
+function getImportProvider() {
+  if (!importProvider) importProvider = new ethers.JsonRpcProvider(BSC_RPC);
+  return importProvider;
+}
+
+function formatUnits(val, dec) {
+  try { return ethers.formatUnits(val, dec); } catch { return '0'; }
+}
+function isAddress(addr) {
+  return ethers.isAddress(String(addr || '').trim());
+}
+function shortAddr(addr) {
+  return addr ? `${addr.slice(0,6)}...${addr.slice(-4)}` : '';
+}
+
+const COLORS = ['#D4A017','#F5C842','#38BDF8','#34D399','#FB923C','#F472B6','#A78BFA','#22D3EE'];
+
+// Ave.ai API
+const AVE_API_KEY = 'mwQOPupoqBczQqJVJUyVWMZKV7WVVXwQ2lm60as8dRLCIhm64MJe06gCZD4Kva1L';
+const AVE_BASE = 'https://prod.ave-api.com';
+
+// Read token info from BSC chain + Ave.ai market data
+async function fetchTokenData(addr) {
+  const provider = getImportProvider();
+  const contract = new ethers.Contract(addr, TOKEN_ABI, provider);
+  const [name, symbol, decimals, totalSupply, mintPrice, tokenPerMint,
+    mintedCount, maxMintCount, mintEnabled, tradingOpen
+  ] = await Promise.all([
+    contract.name(), contract.symbol(), contract.decimals(), contract.totalSupply(),
+    contract.mintPrice(), contract.tokenPerMint(), contract.mintedCount(),
+    contract.maxMintCount(), contract.mintEnabled(), contract.tradingOpen()
+  ]);
+  const dec = Number(decimals);
+  const minted = Number(mintedCount);
+  const max = Number(maxMintCount);
+  const progress = max > 0 ? Math.min(100, Math.round(minted / max * 100)) : 0;
+
+  // Status: live = minting active & <80%, soon = >=80%, ended = trading open or mint closed
+  let statusVal = 'ended';
+  if (mintEnabled && progress < 80) statusVal = 'live';
+  else if (mintEnabled && progress >= 80) statusVal = 'soon';
+
+  // Try Ave.ai for market data
+  let marketPrice = Number(formatUnits(mintPrice, 18)); // fallback: mint price in BNB
+  let priceUsd    = marketPrice;  // will be overwritten if Ave.ai returns USD
+  let marketCap   = '--';
+  let volume24h   = '--';
+  let change24h   = '--';
+  let hasMarket   = false;
+
+  try {
+    const aveRes = await fetch(
+      `${AVE_BASE}/v2/tokens?keyword=${encodeURIComponent(addr)}&chain=bsc`,
+      { headers: { 'X-API-KEY': AVE_API_KEY } }
+    );
+    if (aveRes.ok) {
+      const data = await aveRes.json();
+      const tokens = data?.data?.tokens || data?.tokens || data || [];
+      const match = Array.isArray(tokens)
+        ? tokens.find(t => (t.token || '').toLowerCase() === addr.toLowerCase())
+        : null;
+      if (match) {
+        hasMarket = true;
+        if (match.current_price_usd) {
+          priceUsd = Number(match.current_price_usd);
+          marketPrice = priceUsd;
+        }
+        if (match.price_change_24h)  change24h = Number(match.price_change_24h);
+        if (match.tx_volume_u_24h)   volume24h = '$' + formatCompact(Number(match.tx_volume_u_24h));
+        if (match.market_cap)        marketCap = '$' + formatCompact(Number(match.market_cap));
+      }
+    }
+  } catch { /* Ave.ai unreachable — keep fallback */ }
+
+  return {
+    rank: 0, address: addr,
+    name, sym: symbol,
+    color: COLORS[Math.floor(Math.random() * COLORS.length)],
+    mintPrice: Number(formatUnits(mintPrice, 18)),
+    price: marketPrice,
+    priceUsd: priceUsd,
+    cap: marketCap,
+    vol: volume24h,
+    change: change24h,
+    progress, status: statusVal,
+    decimals: dec,
+    mintedCount: minted,
+    maxMintCount: max,
+    mintEnabled, tradingOpen,
+    hasMarket
+  };
+}
+
+function formatCompact(num) {
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B';
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M';
+  if (num >= 1e3) return (num / 1e3).toFixed(2) + 'K';
+  return num.toFixed(2);
+}
+
+// ── Load public tokens from tokens.json (fetched on each page load, cached 5 min) ──
+async function loadPublicTokens() {
+  const cache = loadPublicCache();
+  const cacheAge = cache.length && cache[0]._ts ? Date.now() - cache[0]._ts : Infinity;
+  const isFresh = cache.length && cacheAge < 5 * 60 * 1000;
+
+  if (!isFresh) {
+    try {
+      const res = await fetch('tokens.json');
+      if (!res.ok) throw new Error('fetch failed');
+      const addresses = await res.json();
+      // Filter valid addresses only (skip comments/examples like "0x")
+      const addrList = addresses.filter(a => isAddress(a.address)).map(a => a.address);
+      // Read chain data for each, keep cache for already-known ones
+      const updated = [];
+      for (const addr of addrList) {
+        try {
+          const existing = cache.find(t => t.address.toLowerCase() === addr.toLowerCase());
+          if (existing) { updated.push(existing); continue; }
+          const data = await fetchTokenData(addr);
+          data.source = 'public';
+          data._ts = Date.now();
+          updated.push(data);
+        } catch { /* skip broken/unreadable addresses */ }
+      }
+      // Merge: keep cached public tokens that are still in the address list
+      publicTokens = updated;
+      savePublicCache(publicTokens);
+    } catch {
+      // Network error or tokens.json missing — fall back to cache
+      publicTokens = cache;
+    }
+  } else {
+    publicTokens = cache;
+  }
+  // Remove _ts before rendering
+  publicTokens.forEach(t => { delete t._ts; });
+  renderTokens();
+}
+
+// ── Manual import (personal, saved to this browser only) ──
+async function importContract() {
+  if (importBusy) return;
+  const input = document.getElementById('importAddress');
+  const btn = document.getElementById('importBtn');
+  const status = document.getElementById('importStatus');
+  const addr = input.value.trim();
+
+  if (!isAddress(addr)) {
+    status.textContent = '请输入有效的合约地址';
+    status.style.color = '#ef4444'; return;
+  }
+  if (localTokens.some(t => t.address.toLowerCase() === addr.toLowerCase()) ||
+      publicTokens.some(t => t.address.toLowerCase() === addr.toLowerCase())) {
+    status.textContent = '该合约已存在';
+    status.style.color = '#D4A017'; return;
+  }
+
+  importBusy = true;
+  btn.disabled = true; btn.textContent = '读取中...';
+  status.textContent = '正在读取链上数据...';
+  status.style.color = 'var(--muted)';
+
+  try {
+    const data = await fetchTokenData(addr);
+    data.source = 'local';
+    localTokens.push(data);
+    saveLocalTokens(localTokens);
+    input.value = '';
+    status.textContent = `已导入 ${data.name} (${data.sym})`;
+    status.style.color = '#22c55e';
+    renderTokens();
+  } catch (err) {
+    const msg = err.shortMessage || err.message || String(err);
+    status.textContent = '读取失败: ' + (msg.length > 60 ? msg.slice(0,60)+'...' : msg);
+    status.style.color = '#ef4444';
+  } finally {
+    importBusy = false; btn.disabled = false; btn.textContent = '导入合约';
+  }
+}
+
+function removeLocalToken(address) {
+  localTokens = localTokens.filter(t => t.address.toLowerCase() !== address.toLowerCase());
+  saveLocalTokens(localTokens);
+  renderTokens();
 }
 
 let tokFilterState = 'all';
@@ -1473,11 +1703,40 @@ function renderTokens() {
   }
 
   tbody.innerHTML = list.map((t, i) => {
-    const chgClass = t.imported ? '' : t.change >= 0 ? 'tok-up' : 'tok-down';
-    const chgSign  = t.imported ? '' : t.change >= 0 ? '+' : '';
+    const isLocal  = t.source === 'local';
+    const isPublic = t.source === 'public';
     const statusLabel = { live:'进行中', soon:'即将开始', ended:'已结束' }[t.status];
-    const actionLabel = t.status === 'live' ? '参与' : t.status === 'soon' ? '预约' : '查看';
-    const actionDisabled = t.status === 'ended' ? 'disabled' : '';
+
+    // Action: live→mint, soon→预约, ended→Ave.ai trading
+    let actionHtml = '';
+    if (t.status === 'live') {
+      actionHtml = `<a href="launch/mint.html?contract=${t.address}" target="_blank" class="tok-action-link">参与</a>`;
+    } else if (t.status === 'soon') {
+      actionHtml = `<a href="launch/mint.html?contract=${t.address}" target="_blank" class="tok-action-link">预约</a>`;
+    } else {
+      actionHtml = `<a href="https://ave.ai/token/${t.address}?chain=bsc" target="_blank" class="tok-action-link ended">查看交易</a>`;
+    }
+
+    let badge = '';
+    if (isPublic) badge = '<span style="font-size:9px;color:#38BDF8;background:rgba(56,189,248,0.12);padding:2px 6px;margin-left:4px;border-radius:2px;">全员可见</span>';
+    else if (isLocal) badge = '<span style="font-size:9px;color:var(--gold);background:var(--gold-dim);padding:2px 6px;margin-left:4px;border-radius:2px;">个人</span>';
+    const showRemove = isLocal;
+    const showAddress = isPublic || isLocal;
+
+    // Price display: Ave.ai returns USD, show $ prefix; fallback shows BNB
+    const priceDisplay = t.hasMarket
+      ? '$' + (t.price < 0.0001 ? t.price.toExponential(2) : t.price.toFixed(6))
+      : t.price.toFixed(6) + ' BNB';
+    const mintInfo = t.hasMarket
+      ? `<br><span style="font-size:10px;color:var(--muted)">发行价 ${t.mintPrice.toFixed(6)} BNB</span>`
+      : '';
+
+    // 24h change
+    const chgNum  = t.change || 0;
+    const chgClass = chgNum > 0 ? 'tok-up' : chgNum < 0 ? 'tok-down' : '';
+    const chgSign  = chgNum > 0 ? '+' : '';
+    const chgDisplay = t.hasMarket ? (chgSign + chgNum.toFixed(2) + '%') : '--';
+
     return `
     <tr>
       <td class="tok-rank">${i+1}</td>
@@ -1485,150 +1744,30 @@ function renderTokens() {
         <div class="tok-name-cell">
           <div class="tok-icon" style="background:${t.color}">${t.sym.slice(0,2)}</div>
           <div>
-            <div class="tok-name">${t.name} ${t.imported ? '<span style="font-size:9px;color:var(--gold);background:var(--gold-dim);padding:1px 5px;clip-path:polygon(3px 0%,100% 0%,calc(100% - 3px) 100%,0% 100%);margin-left:4px;">已导入</span>' : ''}</div>
-            <div class="tok-sym" title="${t.address||''}">${t.sym}${t.imported ? ' · '+shortAddr(t.address) : ''}</div>
+            <div class="tok-name">${t.name} ${badge}</div>
+            <div class="tok-sym" title="${t.address||''}">${t.sym}${showAddress ? ' · '+shortAddr(t.address) : ''}</div>
           </div>
         </div>
       </td>
-      <td class="tok-price">$${t.price.toFixed(3)}</td>
-      <td><span class="tok-change ${chgClass}">${t.imported ? '--' : chgSign+t.change+'%'}</span></td>
+      <td class="tok-price">${priceDisplay}${mintInfo}</td>
+      <td><span class="tok-change ${chgClass}">${chgDisplay}</span></td>
       <td class="tok-cap">${t.cap}</td>
       <td class="tok-vol">${t.vol}</td>
       <td>
         <div class="tok-bar-wrap"><div class="tok-bar" style="width:${t.progress}%"></div></div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px">${t.progress}% ${t.imported ? '('+t.mintedCount+'/'+t.maxMintCount+')' : ''}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">${t.progress}% (${t.mintedCount||0}/${t.maxMintCount||0})</div>
       </td>
       <td><span class="tok-status ${t.status}">${statusLabel}</span></td>
       <td>
-        <button class="tok-action" ${actionDisabled}>${actionLabel}</button>
-        ${t.imported ? `<button class="tok-remove-btn" onclick="removeImportedToken('${t.address}')" title="移除">✕</button>` : ''}
+        ${actionHtml}
+        ${showRemove ? `<button class="tok-remove-btn" onclick="removeLocalToken('${t.address}')" title="移除">✕</button>` : ''}
       </td>
     </tr>`;
   }).join('');
 }
 
-// ── Import contract from BSC chain ──
-const BSC_RPC = 'https://bsc-dataseed1.binance.org';
-let importProvider = null;
-let importBusy = false;
-
-function getImportProvider() {
-  if (!importProvider) {
-    importProvider = new ethers.JsonRpcProvider(BSC_RPC);
-  }
-  return importProvider;
-}
-
-function formatUnits(val, dec) {
-  try { return ethers.formatUnits(val, dec); } catch { return '0'; }
-}
-
-function isAddress(addr) {
-  return ethers.isAddress(String(addr || '').trim());
-}
-
-function shortAddr(addr) {
-  return addr ? `${addr.slice(0,6)}...${addr.slice(-4)}` : '';
-}
-
-async function importContract() {
-  if (importBusy) return;
-  const input = document.getElementById('importAddress');
-  const btn = document.getElementById('importBtn');
-  const status = document.getElementById('importStatus');
-  const addr = input.value.trim();
-
-  if (!isAddress(addr)) {
-    status.textContent = '请输入有效的合约地址';
-    status.style.color = '#ef4444';
-    return;
-  }
-
-  // Check duplicate
-  if (importedTokens.some(t => t.address.toLowerCase() === addr.toLowerCase())) {
-    status.textContent = '该合约已导入';
-    status.style.color = '#D4A017';
-    return;
-  }
-
-  importBusy = true;
-  btn.disabled = true;
-  btn.textContent = '读取中...';
-  status.textContent = '正在读取链上数据...';
-  status.style.color = 'var(--muted)';
-
-  try {
-    const provider = getImportProvider();
-    const contract = new ethers.Contract(addr, TOKEN_ABI, provider);
-
-    const [
-      name, symbol, decimals, totalSupply, mintPrice, tokenPerMint,
-      mintedCount, maxMintCount, mintEnabled, tradingOpen
-    ] = await Promise.all([
-      contract.name(), contract.symbol(), contract.decimals(), contract.totalSupply(),
-      contract.mintPrice(), contract.tokenPerMint(), contract.mintedCount(),
-      contract.maxMintCount(), contract.mintEnabled(), contract.tradingOpen()
-    ]);
-
-    const dec = Number(decimals);
-    const minted = Number(mintedCount);
-    const max = Number(maxMintCount);
-    const progress = max > 0 ? Math.min(100, Math.round(minted / max * 100)) : 0;
-
-    let statusVal = 'ended';
-    if (mintEnabled && progress < 100) statusVal = 'live';
-    else if (!tradingOpen && progress === 0) statusVal = 'soon';
-    else statusVal = 'ended';
-
-    const colors = ['#D4A017','#F5C842','#38BDF8','#34D399','#FB923C','#F472B6','#A78BFA','#22D3EE'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-
-    const newToken = {
-      rank: 0,
-      name: name,
-      sym: symbol,
-      color: color,
-      price: Number(formatUnits(mintPrice, 18)),
-      change: 0,
-      cap: '--',
-      vol: '--',
-      progress: progress,
-      status: statusVal,
-      address: addr,
-      imported: true,
-      totalSupply: formatUnits(totalSupply, dec),
-      decimals: dec,
-      mintedCount: minted,
-      maxMintCount: max,
-      mintEnabled: mintEnabled,
-      tradingOpen: tradingOpen
-    };
-
-    importedTokens.push(newToken);
-    saveTokens(importedTokens);
-    input.value = '';
-    status.textContent = `已导入 ${name} (${symbol})`;
-    status.style.color = '#22c55e';
-    renderTokens();
-  } catch (err) {
-    const msg = err.shortMessage || err.message || String(err);
-    status.textContent = '读取失败: ' + (msg.length > 60 ? msg.slice(0,60)+'...' : msg);
-    status.style.color = '#ef4444';
-  } finally {
-    importBusy = false;
-    btn.disabled = false;
-    btn.textContent = '导入合约';
-  }
-}
-
-function removeImportedToken(address) {
-  importedTokens = importedTokens.filter(t => t.address.toLowerCase() !== address.toLowerCase());
-  saveTokens(importedTokens);
-  renderTokens();
-}
-
-// Init token table when page loads
-renderTokens();
+// Init: load public tokens from tokens.json, then render
+loadPublicTokens();
 
 </script>
 </body>

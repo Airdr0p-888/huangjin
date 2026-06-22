@@ -809,7 +809,7 @@ async function deployContract(form) {
 
 function saveDeployedToken(address, args) {
   try {
-    const storageKey = 'goldlaunch_imported_tokens';
+    const storageKey = 'goldlaunch_local_tokens';
     const existing = JSON.parse(localStorage.getItem(storageKey) || '[]');
 
     // Avoid duplicates
