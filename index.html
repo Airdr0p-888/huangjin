@@ -215,7 +215,7 @@ h1 em {
   gap: 14px;
   justify-content: center;
   flex-wrap: wrap;
-  margin-bottom: 64px;
+  margin-bottom: 0;
 }
 
 .btn-fill {
@@ -249,29 +249,6 @@ h1 em {
 }
 .btn-out:hover { background: var(--gold-dim); }
 
-.stats {
-  display: flex;
-  justify-content: center;
-  gap: 56px;
-  padding-top: 36px;
-  border-top: 1px solid var(--border-subtle);
-  flex-wrap: wrap;
-}
-
-.stat-num {
-  display: block;
-  font-size: 30px;
-  font-weight: 800;
-  color: var(--gold);
-  letter-spacing: -1px;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
 
 /* ── TAB CONTENT AREA ── */
 #content {
@@ -579,6 +556,191 @@ h1 em {
 .phase-list li::before { content: '—'; color: var(--gold-dark); flex-shrink: 0; }
 .road-phase.done .phase-list li::before { content: '✓'; color: var(--gold); }
 
+/* ── TOKEN SQUARE ── */
+#page-tokens .tok-header { text-align: center; margin-bottom: 52px; }
+#page-tokens .tok-header .sec-sub { margin: 0 auto; }
+
+.tok-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.tok-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tok-filter {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all .2s;
+  clip-path: polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  font-family: inherit;
+}
+
+.tok-filter:hover { color: var(--gold); border-color: var(--border); }
+.tok-filter.active { background: var(--gold-dim); border-color: var(--border); color: var(--gold); }
+
+.tok-search {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text);
+  font-size: 12px;
+  padding: 7px 14px;
+  width: 200px;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .2s;
+}
+.tok-search:focus { border-color: var(--border); }
+.tok-search::placeholder { color: var(--muted); }
+
+/* Table */
+.tok-table-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  overflow-x: auto;
+}
+
+.tok-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 700px;
+}
+
+.tok-table thead tr {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.tok-table th {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 14px 20px;
+  text-align: left;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color .2s;
+}
+
+.tok-table th:hover { color: var(--gold); }
+.tok-table th.sorted { color: var(--gold); }
+.tok-table th .sort-arrow { margin-left: 4px; opacity: .5; }
+.tok-table th.sorted .sort-arrow { opacity: 1; }
+
+.tok-table td {
+  padding: 16px 20px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.tok-table tbody tr { transition: background .15s; }
+.tok-table tbody tr:hover { background: rgba(212,160,23,0.04); }
+.tok-table tbody tr:last-child td { border-bottom: none; }
+
+.tok-rank { color: var(--muted); font-size: 12px; }
+
+.tok-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tok-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+  color: #000;
+}
+
+.tok-name { font-weight: 600; font-size: 13px; }
+.tok-sym  { font-size: 11px; color: var(--muted); }
+
+.tok-price { font-weight: 600; }
+
+.tok-change {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.tok-up   { color: #22c55e; background: rgba(34,197,94,.1); }
+.tok-down { color: #ef4444; background: rgba(239,68,68,.1); }
+
+.tok-cap  { color: var(--text); }
+.tok-vol  { color: var(--muted); font-size: 12px; }
+
+.tok-status {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  clip-path: polygon(4px 0%,100% 0%,calc(100% - 4px) 100%,0% 100%);
+}
+.tok-status.live   { background: rgba(34,197,94,.12); color: #22c55e; border: 1px solid rgba(34,197,94,.25); }
+.tok-status.soon   { background: var(--gold-dim); color: var(--gold); border: 1px solid var(--border); }
+.tok-status.ended  { background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid var(--border-subtle); }
+
+.tok-action {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  padding: 5px 14px;
+  clip-path: polygon(5px 0%,100% 0%,calc(100% - 5px) 100%,0% 100%);
+  transition: background .2s;
+  cursor: pointer;
+  background: transparent;
+  font-family: inherit;
+}
+.tok-action:hover { background: var(--gold-dim); }
+.tok-action:disabled { opacity: .35; cursor: default; }
+
+.tok-bar-wrap {
+  background: var(--border-subtle);
+  height: 3px;
+  border-radius: 2px;
+  width: 80px;
+  overflow: hidden;
+}
+.tok-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-dark), var(--gold));
+  border-radius: 2px;
+}
+
+.tok-empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* ── FAQ ── */
 #page-faq {
   max-width: 720px;
@@ -781,6 +943,7 @@ footer {
   .road-track { grid-template-columns: 1fr 1fr; row-gap: 40px; }
   .road-track::before { display: none; }
   .foot-grid { grid-template-columns: 1fr 1fr; }
+  .tok-table th, .tok-table td { padding: 12px 12px; }
 }
 
 @media (max-width: 600px) {
@@ -790,7 +953,6 @@ footer {
   .foot-grid { grid-template-columns: 1fr; }
   nav { padding: 0 5%; }
   #cta { padding: 44px 24px; margin: 0 5%; }
-  .stats { gap: 28px; }
 }
 </style>
 </head>
@@ -805,6 +967,7 @@ footer {
   <ul class="nav-menu">
     <li><a href="#" class="active" onclick="switchTab('about');return false;">关于</a></li>
     <li><a href="#" onclick="switchTab('features');return false;">特性</a></li>
+    <li><a href="#" onclick="switchTab('tokens');return false;">代币广场</a></li>
     <li><a href="#" onclick="switchTab('roadmap');return false;">路线图</a></li>
     <li><a href="#" onclick="switchTab('faq');return false;">FAQ</a></li>
   </ul>
@@ -822,24 +985,6 @@ footer {
     <div class="hero-btns">
       <a href="#" class="btn-fill" onclick="switchTab('features');return false;">探索平台</a>
       <a href="#" class="btn-out" onclick="switchTab('about');return false;">了解更多</a>
-    </div>
-    <div class="stats">
-      <div>
-        <span class="stat-num" data-target="24">0</span><span class="stat-num">M+</span>
-        <div class="stat-label">总募集资金</div>
-      </div>
-      <div>
-        <span class="stat-num" data-count="38">0</span>
-        <div class="stat-label">已发射项目</div>
-      </div>
-      <div>
-        <span class="stat-num" data-count="120">0</span><span class="stat-num">K+</span>
-        <div class="stat-label">社区用户</div>
-      </div>
-      <div>
-        <span class="stat-num">99.8%</span>
-        <div class="stat-label">上线成功率</div>
-      </div>
     </div>
   </div>
 </section>
@@ -950,6 +1095,46 @@ footer {
           <h3>DAO 社区治理</h3>
           <p>持有者参与平台关键决策，包括新项目准入投票、费率调整及协议升级提案。</p>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: TOKENS -->
+  <div id="page-tokens" class="tab-page">
+    <div class="section">
+      <div class="tok-header">
+        <p class="sec-label">代币广场</p>
+        <h2 class="sec-title">黄金生态<span>代币全览</span></h2>
+        <p class="sec-sub">浏览平台所有 IDO 代币，实时行情、状态一目了然</p>
+      </div>
+
+      <div class="tok-toolbar">
+        <div class="tok-filters">
+          <button class="tok-filter active" onclick="filterTokens('all',this)">全部</button>
+          <button class="tok-filter" onclick="filterTokens('live',this)">进行中</button>
+          <button class="tok-filter" onclick="filterTokens('soon',this)">即将开始</button>
+          <button class="tok-filter" onclick="filterTokens('ended',this)">已结束</button>
+        </div>
+        <input class="tok-search" type="text" placeholder="搜索代币名称 / 符号…" oninput="searchTokens(this.value)">
+      </div>
+
+      <div class="tok-table-wrap">
+        <table class="tok-table" id="tokTable">
+          <thead>
+            <tr>
+              <th onclick="sortTokens('rank')">#<span class="sort-arrow">↕</span></th>
+              <th onclick="sortTokens('name')">代币<span class="sort-arrow">↕</span></th>
+              <th onclick="sortTokens('price')">发行价<span class="sort-arrow">↕</span></th>
+              <th onclick="sortTokens('change')">24h 涨跌<span class="sort-arrow">↕</span></th>
+              <th onclick="sortTokens('cap')">市值<span class="sort-arrow">↕</span></th>
+              <th onclick="sortTokens('vol')">24h 成交量<span class="sort-arrow">↕</span></th>
+              <th>募集进度</th>
+              <th onclick="sortTokens('status')">状态<span class="sort-arrow">↕</span></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tokBody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1124,7 +1309,7 @@ function switchTab(name) {
   if (target) target.classList.add('active');
   // Update nav active state
   document.querySelectorAll('.nav-menu a').forEach(a => a.classList.remove('active'));
-  const navMap = { about:0, features:1, roadmap:2, faq:3 };
+  const navMap = { about:0, features:1, tokens:2, roadmap:3, faq:4 };
   if (navMap[name] !== undefined) {
     document.querySelectorAll('.nav-menu a')[navMap[name]].classList.add('active');
   }
@@ -1144,42 +1329,101 @@ function toggleFaq(el) {
   if (!open) item.classList.add('open');
 }
 
-// ── Stat counter animation ──
-function animateStats() {
-  document.querySelectorAll('[data-target]').forEach(el => {
-    const target = +el.getAttribute('data-target');
-    const suffix = el.nextElementSibling ? '' : '';
-    let current = 0;
-    const step = target / 40;
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) { current = target; clearInterval(timer); }
-      el.textContent = Math.floor(current);
-    }, 30);
-  });
-  document.querySelectorAll('[data-count]').forEach(el => {
-    const target = +el.getAttribute('data-count');
-    let current = 0;
-    const step = target / 40;
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= target) { current = target; clearInterval(timer); }
-      el.textContent = Math.floor(current);
-    }, 30);
-  });
+// ── TOKEN SQUARE DATA & LOGIC ──
+const TOKENS = [
+  { rank:1,  name:'GoldCore',    sym:'GCR',  color:'#D4A017', price:0.085,  change:+12.4, cap:'$8.5M',   vol:'$1.2M', progress:100, status:'ended' },
+  { rank:2,  name:'AuronFi',     sym:'AUFI', color:'#F5C842', price:0.042,  change:+6.8,  cap:'$4.2M',   vol:'$870K', progress:88,  status:'live'  },
+  { rank:3,  name:'GoldSwap',    sym:'GSWP', color:'#C084FC', price:0.021,  change:-3.1,  cap:'$2.1M',   vol:'$430K', progress:61,  status:'live'  },
+  { rank:4,  name:'BullionDAO',  sym:'BULL', color:'#38BDF8', price:0.056,  change:+18.7, cap:'$5.6M',   vol:'$2.1M', progress:100, status:'ended' },
+  { rank:5,  name:'GoldMine',    sym:'GMIN', color:'#34D399', price:0.013,  change:+2.3,  cap:'$1.3M',   vol:'$220K', progress:40,  status:'live'  },
+  { rank:6,  name:'AurumPad',    sym:'AURM', color:'#FB923C', price:0.077,  change:-1.5,  cap:'$7.7M',   vol:'$540K', progress:0,   status:'soon'  },
+  { rank:7,  name:'GoldenVault', sym:'GVLT', color:'#F472B6', price:0.033,  change:+9.2,  cap:'$3.3M',   vol:'$680K', progress:0,   status:'soon'  },
+  { rank:8,  name:'MetalFi',     sym:'MTFI', color:'#A78BFA', price:0.019,  change:-5.8,  cap:'$1.9M',   vol:'$310K', progress:100, status:'ended' },
+  { rank:9,  name:'GoldLock',    sym:'GLOCK',color:'#D4A017', price:0.044,  change:+3.6,  cap:'$4.4M',   vol:'$760K', progress:75,  status:'live'  },
+  { rank:10, name:'OrichalGold', sym:'ORC',  color:'#22D3EE', price:0.062,  change:+24.1, cap:'$6.2M',   vol:'$3.4M', progress:0,   status:'soon'  },
+];
+
+let tokFilterState = 'all';
+let tokSearchState = '';
+let tokSortKey = 'rank';
+let tokSortAsc = true;
+
+function filterTokens(f, btn) {
+  tokFilterState = f;
+  document.querySelectorAll('.tok-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderTokens();
 }
 
-// Run once when hero is visible
-let statsDone = false;
-const heroObserver = new IntersectionObserver(entries => {
-  entries.forEach(e => {
-    if (e.isIntersecting && !statsDone) {
-      statsDone = true;
-      animateStats();
-    }
+function searchTokens(val) {
+  tokSearchState = val.toLowerCase();
+  renderTokens();
+}
+
+function sortTokens(key) {
+  if (tokSortKey === key) tokSortAsc = !tokSortAsc;
+  else { tokSortKey = key; tokSortAsc = true; }
+  document.querySelectorAll('.tok-table th').forEach(th => th.classList.remove('sorted'));
+  const idx = ['rank','name','price','change','cap','vol','_','status'].indexOf(key);
+  const ths = document.querySelectorAll('.tok-table th');
+  if (ths[idx]) ths[idx].classList.add('sorted');
+  renderTokens();
+}
+
+function renderTokens() {
+  let list = TOKENS.filter(t => {
+    if (tokFilterState !== 'all' && t.status !== tokFilterState) return false;
+    if (tokSearchState && !t.name.toLowerCase().includes(tokSearchState) && !t.sym.toLowerCase().includes(tokSearchState)) return false;
+    return true;
   });
-}, { threshold: 0.3 });
-heroObserver.observe(document.getElementById('hero'));
+
+  list.sort((a, b) => {
+    let va = a[tokSortKey], vb = b[tokSortKey];
+    if (typeof va === 'string') { va = va.replace(/[^0-9.]/g,''); vb = vb.replace(/[^0-9.]/g,''); va = parseFloat(va)||0; vb = parseFloat(vb)||0; }
+    return tokSortAsc ? va - vb : vb - va;
+  });
+
+  const tbody = document.getElementById('tokBody');
+  if (!list.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="tok-empty">暂无符合条件的代币</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map((t, i) => {
+    const chgClass = t.change >= 0 ? 'tok-up' : 'tok-down';
+    const chgSign  = t.change >= 0 ? '+' : '';
+    const statusLabel = { live:'进行中', soon:'即将开始', ended:'已结束' }[t.status];
+    const actionLabel = t.status === 'live' ? '参与' : t.status === 'soon' ? '预约' : '查看';
+    const actionDisabled = t.status === 'ended' ? 'disabled' : '';
+    return `
+    <tr>
+      <td class="tok-rank">${i+1}</td>
+      <td>
+        <div class="tok-name-cell">
+          <div class="tok-icon" style="background:${t.color}">${t.sym.slice(0,2)}</div>
+          <div>
+            <div class="tok-name">${t.name}</div>
+            <div class="tok-sym">${t.sym}</div>
+          </div>
+        </div>
+      </td>
+      <td class="tok-price">$${t.price.toFixed(3)}</td>
+      <td><span class="tok-change ${chgClass}">${chgSign}${t.change}%</span></td>
+      <td class="tok-cap">${t.cap}</td>
+      <td class="tok-vol">${t.vol}</td>
+      <td>
+        <div class="tok-bar-wrap"><div class="tok-bar" style="width:${t.progress}%"></div></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px">${t.progress}%</div>
+      </td>
+      <td><span class="tok-status ${t.status}">${statusLabel}</span></td>
+      <td><button class="tok-action" ${actionDisabled}>${actionLabel}</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// Init token table when page loads
+renderTokens();
+
 </script>
 </body>
 </html>
